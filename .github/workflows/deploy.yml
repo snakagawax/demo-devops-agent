@@ -17,7 +17,7 @@ on:
 env:
   AWS_REGION: us-east-1
   # TODO: 実際のIAMロールARNに置き換える
-  ROLE_ARN: arn:aws:iam::ACCOUNT_ID:role/demo-devops-agent-github-actions-role
+  ROLE_ARN: arn:aws:iam::464923193334:role/demo-devops-agent-github-actions-role
 
 permissions:
   id-token: write
