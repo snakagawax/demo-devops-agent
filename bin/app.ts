@@ -12,8 +12,8 @@ new DynamoDBThrottleStack(app, 'DemoDevOpsAgentStack', {
   },
   // Initial configuration: WCU=5 for normal operation
   // To trigger throttling, change to WCU=1
-  writeCapacity: 5,
-  readCapacity: 5,
+  writeCapacity: 1,
+  readCapacity: 1,
 });
 
 app.synth();
