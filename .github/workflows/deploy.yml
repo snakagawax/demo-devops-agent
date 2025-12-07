@@ -1,0 +1,61 @@
+# CDK デプロイワークフロー
+# GitHub OIDC連携でAWSに認証し、CDKスタックをデプロイ
+#
+# 使用方法:
+# 1. AWS ConsoleでGitHub OIDC Providerを作成
+# 2. GitHub Actions用IAMロールを作成（信頼ポリシーでこのリポジトリを許可）
+# 3. このファイルの ROLE_ARN を実際の値に更新
+# 4. コードを変更してpush → 自動デプロイ
+
+name: Deploy CDK Stack
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  # TODO: 実際のIAMロールARNに置き換える
+  ROLE_ARN: arn:aws:iam::ACCOUNT_ID:role/demo-devops-agent-github-actions-role
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy CDK Stack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: CDK Synth
+        run: npx cdk synth
+
+      - name: CDK Deploy
+        run: npx cdk deploy --require-approval never
+
+      - name: Verify deployment
+        run: |
+          echo "Deployment completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          aws cloudformation describe-stacks \
+            --stack-name DemoDevOpsAgentStack \
+            --query 'Stacks[0].StackStatus'
