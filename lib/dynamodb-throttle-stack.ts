@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
@@ -24,8 +25,8 @@ export interface DynamoDBThrottleStackProps extends cdk.StackProps {
 
 export class DynamoDBThrottleStack extends cdk.Stack {
   public readonly table: dynamodb.Table;
-  public readonly writerFunction: lambda.Function;
-  public readonly webhookNotifierFunction: lambda.Function;
+  public readonly writerFunction: NodejsFunction;
+  public readonly webhookNotifierFunction: NodejsFunction;
 
   constructor(scope: Construct, id: string, props?: DynamoDBThrottleStackProps) {
     super(scope, id, props);
@@ -47,29 +48,23 @@ export class DynamoDBThrottleStack extends cdk.Stack {
     });
 
     // ===========================================
-    // Lambda: Writer Function
+    // Lambda: Writer Function (NodejsFunction with esbuild)
     // ===========================================
-    this.writerFunction = new lambda.Function(this, 'WriterFunction', {
+    this.writerFunction = new NodejsFunction(this, 'WriterFunction', {
       functionName: 'demo-devops-agent-writer',
+      entry: path.join(__dirname, '../lambda/writer.ts'),
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'writer.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c', [
-              'npm init -y',
-              'npm install @aws-sdk/client-dynamodb',
-              'cp -r /asset-input/* /asset-output/',
-            ].join(' && '),
-          ],
-        },
-      }),
+      handler: 'handler',
       timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       environment: {
         TABLE_NAME: this.table.tableName,
         WRITE_COUNT: '50',
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: [],
       },
     });
 
@@ -77,13 +72,13 @@ export class DynamoDBThrottleStack extends cdk.Stack {
     this.table.grantWriteData(this.writerFunction);
 
     // ===========================================
-    // Lambda: Webhook Notifier Function
+    // Lambda: Webhook Notifier Function (NodejsFunction with esbuild)
     // ===========================================
-    this.webhookNotifierFunction = new lambda.Function(this, 'WebhookNotifierFunction', {
+    this.webhookNotifierFunction = new NodejsFunction(this, 'WebhookNotifierFunction', {
       functionName: 'demo-devops-agent-webhook-notifier',
+      entry: path.join(__dirname, '../lambda/webhook-notifier.ts'),
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'webhook-notifier.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
+      handler: 'handler',
       timeout: cdk.Duration.seconds(30),
       memorySize: 128,
       environment: {
@@ -92,6 +87,11 @@ export class DynamoDBThrottleStack extends cdk.Stack {
         WEBHOOK_SECRET: '',
         WRITER_LAMBDA_ARN: '', // Will be set after deployment
         DYNAMODB_TABLE_ARN: this.table.tableArn,
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: [],
       },
     });
 
