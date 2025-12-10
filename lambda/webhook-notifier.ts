@@ -8,6 +8,7 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const WRITER_LAMBDA_ARN = process.env.WRITER_LAMBDA_ARN || '';
 const DYNAMODB_TABLE_ARN = process.env.DYNAMODB_TABLE_ARN || '';
+const SERVICE_NAME = process.env.SERVICE_NAME || 'DemoDevOpsAgent';
 
 // CloudWatch Alarm event structure
 interface CloudWatchAlarmEvent {
@@ -47,7 +48,7 @@ interface CloudWatchAlarmEvent {
   };
 }
 
-// DevOps Agent webhook payload structure
+// DevOps Agent webhook payload structure (公式ドキュメント準拠)
 interface DevOpsAgentWebhookPayload {
   eventType: string;
   incidentId: string;
@@ -55,8 +56,18 @@ interface DevOpsAgentWebhookPayload {
   priority: string;
   title: string;
   description: string;
+  service: string;
   timestamp: string;
-  affectedResources: string[];
+  data: {
+    metadata: {
+      region: string;
+      environment: string;
+      affectedResources: string[];
+      alarmName: string;
+      alarmArn: string;
+      accountId: string;
+    };
+  };
 }
 
 export const handler = async (event: CloudWatchAlarmEvent): Promise<void> => {
@@ -66,6 +77,9 @@ export const handler = async (event: CloudWatchAlarmEvent): Promise<void> => {
   const alarmState = event.alarmData?.state?.value || 'UNKNOWN';
   const stateReason = event.alarmData?.state?.reason || 'No reason provided';
   const timestamp = event.alarmData?.state?.timestamp || new Date().toISOString();
+  const accountId = event.accountId || 'unknown';
+  const region = event.region || 'us-east-1';
+  const alarmArn = event.alarmArn || '';
 
   console.log(`Alarm: ${alarmName}`);
   console.log(`State: ${alarmState}`);
@@ -82,7 +96,7 @@ export const handler = async (event: CloudWatchAlarmEvent): Promise<void> => {
     console.log('Webhook is DISABLED (WEBHOOK_ENABLED=false)');
     console.log('To enable, set WEBHOOK_ENABLED=true and configure WEBHOOK_URL and WEBHOOK_SECRET');
     console.log('Would have sent webhook with payload:');
-    const dryRunPayload = buildWebhookPayload(alarmName, stateReason, timestamp);
+    const dryRunPayload = buildWebhookPayload(alarmName, stateReason, timestamp, region, accountId, alarmArn);
     console.log(JSON.stringify(dryRunPayload, null, 2));
     return;
   }
@@ -99,19 +113,22 @@ export const handler = async (event: CloudWatchAlarmEvent): Promise<void> => {
   }
 
   // Build and send webhook
-  const payload = buildWebhookPayload(alarmName, stateReason, timestamp);
+  const payload = buildWebhookPayload(alarmName, stateReason, timestamp, region, accountId, alarmArn);
   console.log('Sending webhook payload:', JSON.stringify(payload, null, 2));
 
   await sendWebhook(payload);
-  console.log('Webhook sent successfully');
+  console.log('Webhook sent successfully to DevOps Agent');
 };
 
 function buildWebhookPayload(
   alarmName: string,
   stateReason: string,
-  timestamp: string
+  timestamp: string,
+  region: string,
+  accountId: string,
+  alarmArn: string
 ): DevOpsAgentWebhookPayload {
-  const incidentId = `${alarmName}-${Date.now()}`;
+  const incidentId = `${alarmName.replace(/\s+/g, '-')}-${Date.now()}`;
 
   // Build affected resources list
   const affectedResources: string[] = [];
@@ -121,16 +138,29 @@ function buildWebhookPayload(
   if (DYNAMODB_TABLE_ARN) {
     affectedResources.push(DYNAMODB_TABLE_ARN);
   }
+  if (alarmArn) {
+    affectedResources.push(alarmArn);
+  }
 
   return {
     eventType: 'incident',
     incidentId,
     action: 'created',
     priority: 'HIGH',
-    title: alarmName,
+    title: `[CloudWatch Alarm] ${alarmName}`,
     description: stateReason,
+    service: SERVICE_NAME,
     timestamp,
-    affectedResources,
+    data: {
+      metadata: {
+        region,
+        environment: 'production',
+        affectedResources,
+        alarmName,
+        alarmArn,
+        accountId,
+      },
+    },
   };
 }
 
