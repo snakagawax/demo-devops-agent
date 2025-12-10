@@ -85,8 +85,6 @@ export class DynamoDBThrottleStack extends cdk.Stack {
         WEBHOOK_ENABLED: 'false',
         WEBHOOK_URL: '',
         WEBHOOK_SECRET: '',
-        WRITER_LAMBDA_ARN: '', // Will be set after deployment
-        DYNAMODB_TABLE_ARN: this.table.tableArn,
         SERVICE_NAME: 'DemoDevOpsAgent',
       },
       bundling: {

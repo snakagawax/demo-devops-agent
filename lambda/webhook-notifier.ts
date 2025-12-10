@@ -6,8 +6,6 @@ import * as url from 'url';
 const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED === 'true';
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
-const WRITER_LAMBDA_ARN = process.env.WRITER_LAMBDA_ARN || '';
-const DYNAMODB_TABLE_ARN = process.env.DYNAMODB_TABLE_ARN || '';
 const SERVICE_NAME = process.env.SERVICE_NAME || 'DemoDevOpsAgent';
 
 // CloudWatch Alarm event structure
@@ -130,17 +128,8 @@ function buildWebhookPayload(
 ): DevOpsAgentWebhookPayload {
   const incidentId = `${alarmName.replace(/\s+/g, '-')}-${Date.now()}`;
 
-  // Build affected resources list
-  const affectedResources: string[] = [];
-  if (WRITER_LAMBDA_ARN) {
-    affectedResources.push(WRITER_LAMBDA_ARN);
-  }
-  if (DYNAMODB_TABLE_ARN) {
-    affectedResources.push(DYNAMODB_TABLE_ARN);
-  }
-  if (alarmArn) {
-    affectedResources.push(alarmArn);
-  }
+  // Build affected resources list from alarm ARN
+  const affectedResources: string[] = alarmArn ? [alarmArn] : [];
 
   return {
     eventType: 'incident',
