@@ -99,8 +99,7 @@ Webhook機能は初期状態で**無効**です。有効にするには：
    - `WEBHOOK_ENABLED`: `true`
    - `WEBHOOK_URL`: DevOps Agent WebhookのURL
    - `WEBHOOK_SECRET`: Webhookシークレット
-   - `WRITER_LAMBDA_ARN`: Writer Lambda関数のARN
-   - `DYNAMODB_TABLE_ARN`: DynamoDBテーブルのARN
+   - `SERVICE_NAME`: サービス名（デフォルト: `DemoDevOpsAgent`）
 
 ## クリーンアップ
 
